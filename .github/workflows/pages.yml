@@ -1,0 +1,52 @@
+name: Deploy PWA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Przygotuj stronę
+        run: |
+          if [ -d www ]; then
+            cp -r www site
+          elif [ -d public ]; then
+            cp -r public site
+          else
+            echo "Nie znaleziono folderu www ani public" && ls -la && exit 1
+          fi
+          rm -f site/cordova.js site/cordova_plugins.js
+
+          cat > site/manifest.json <<'EOF'
+          {
+            "name": "Fiszki",
+            "short_name": "Fiszki",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#efe6d6",
+            "theme_color": "#efe6d6",
+            "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+          }
+          EOF
+
+          sed -i 's#</head>#<link rel="manifest" href="manifest.json"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Fiszki"><meta name="apple-mobile-web-app-status-bar-style" content="default"></head>#' site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
