@@ -1,0 +1,39 @@
+name: Build iOS (unsigned IPA)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+      - run: npm install @capacitor/ios@^7
+      - run: npx cap add ios
+      - run: npx cap sync ios
+
+      - name: Build (bez podpisu)
+        working-directory: ios/App
+        run: |
+          if [ -d App.xcworkspace ]; then TARGET="-workspace App.xcworkspace"; else TARGET="-project App.xcodeproj"; fi
+          xcodebuild $TARGET -scheme App -configuration Release \
+            -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Spakuj do .ipa
+        run: |
+          mkdir Payload
+          cp -R ios/App/build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qr Fiszki.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fiszki-ipa
+          path: Fiszki.ipa
